@@ -68,6 +68,11 @@ class Game {
     
     async setupRenderer() {
         // WebGL診断実行
+        if (typeof WebGLDiagnostic === 'undefined') {
+            console.warn('WebGLDiagnostic not available, proceeding without diagnostics');
+            return this.setupRendererDirect();
+        }
+        
         const diagnostic = new WebGLDiagnostic();
         const diagnosticResult = await diagnostic.runDiagnostic();
         
@@ -107,6 +112,36 @@ class Game {
             
             // フォールバック試行
             await this.attemptWebGLFallback(diagnosticResult);
+        }
+    }
+    
+    // WebGL診断なしでの直接レンダラーセットアップ
+    setupRendererDirect() {
+        try {
+            const canvas = document.getElementById('gameCanvas');
+            const options = {
+                canvas: canvas,
+                alpha: false,
+                antialias: true,
+                depth: true,
+                stencil: false,
+                preserveDrawingBuffer: false
+            };
+            
+            this.renderer = new THREE.WebGLRenderer(options);
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            
+            // 基本機能の設定
+            this.renderer.shadowMap.enabled = true;
+            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+            
+            console.log('✅ WebGLレンダラー初期化成功（診断なし）');
+            
+        } catch (error) {
+            console.error('WebGLレンダラー作成エラー:', error);
+            throw new Error('WebGL initialization failed: ' + error.message);
         }
     }
     
@@ -167,8 +202,10 @@ class Game {
     async attemptWebGLFallback(diagnosticResult) {
         console.log('🔧 WebGLフォールバックを試行します...');
         
-        // WebGL修復を試行
-        await WebGLDiagnostic.attemptRepair();
+        // WebGL修復を試行（利用可能な場合のみ）
+        if (typeof WebGLDiagnostic !== 'undefined') {
+            await WebGLDiagnostic.attemptRepair();
+        }
         
         // 最低限の設定で再試行
         try {
