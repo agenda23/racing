@@ -27,26 +27,40 @@ class CameraController {
         this.lookSmoothingFollow = 0.05;
         this.lookSmoothingChase = 0.03;
         
-        // カメラの現在位置と目標位置
+        // カメラの現在位置と目標位置（後で初期化）
+        this.currentPosition = null;
+        this.targetPosition = null;
+        this.currentLookAt = null;
+        this.targetLookAt = null;
+        
+        // 初期化フラグ
+        this.isInitialized = false;
+    }
+    
+    initialize() {
+        if (this.isInitialized) return;
+        
+        // THREE.Vector3オブジェクトを初期化
         this.currentPosition = new THREE.Vector3();
         this.targetPosition = new THREE.Vector3();
         this.currentLookAt = new THREE.Vector3();
         this.targetLookAt = new THREE.Vector3();
         
-        // 初期化
-        this.initialize();
-    }
-    
-    initialize() {
         // 初期カメラ位置を設定
         this.updateTargetPositions();
         this.camera.position.copy(this.targetPosition);
         this.camera.lookAt(this.targetLookAt);
         this.currentPosition.copy(this.targetPosition);
         this.currentLookAt.copy(this.targetLookAt);
+        
+        this.isInitialized = true;
     }
     
     update(deltaTime) {
+        if (!this.isInitialized) {
+            this.initialize();
+        }
+        
         this.updateTargetPositions();
         this.smoothCameraMovement(deltaTime);
         this.updateCameraOrientation();
