@@ -36,8 +36,8 @@ class Game {
         // パフォーマンス監視
         this.performanceMonitor = new PerformanceMonitor();
         
-        // タイミング
-        this.clock = new THREE.Clock();
+        // タイミング（後で初期化）
+        this.clock = null;
         this.lastTime = 0;
         
         // 初期化は非同期で実行
@@ -46,6 +46,9 @@ class Game {
     
     async initialize() {
         try {
+            // THREE.jsの初期化（まずクロックを作成）
+            this.clock = new THREE.Clock();
+            
             await this.setupRenderer();
             this.setupScene();
             this.setupLighting();
