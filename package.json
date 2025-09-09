@@ -1,0 +1,101 @@
+{
+  "name": "ultimate-3d-racing-game",
+  "version": "1.0.0",
+  "description": "高性能 3D レーシングゲーム - WebGL と Three.js を使用したブラウザベースのレーシングゲーム",
+  "main": "final-game.html",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve . --port 8000",
+    "serve": "python -m http.server 8000",
+    "build": "echo 'No build step required for vanilla JavaScript project'",
+    "test": "echo 'No tests specified yet'",
+    "lint": "echo 'No linting configured yet'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/ultimate-3d-racing-game.git"
+  },
+  "keywords": [
+    "3d",
+    "racing",
+    "game",
+    "webgl",
+    "threejs",
+    "javascript",
+    "browser-game",
+    "3d-graphics",
+    "physics",
+    "車両",
+    "レーシング",
+    "ゲーム",
+    "ブラウザゲーム"
+  ],
+  "author": {
+    "name": "Manus AI",
+    "email": "developer@example.com"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/your-username/ultimate-3d-racing-game/issues"
+  },
+  "homepage": "https://github.com/your-username/ultimate-3d-racing-game#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "serve": "^14.0.0"
+  },
+  "files": [
+    "*.html",
+    "*.js",
+    "*.md",
+    "docs/",
+    "LICENSE"
+  ],
+  "browserslist": [
+    "last 2 Chrome versions",
+    "last 2 Firefox versions",
+    "last 2 Safari versions",
+    "last 2 Edge versions"
+  ],
+  "config": {
+    "port": 8000,
+    "host": "localhost"
+  },
+  "metadata": {
+    "gameType": "3D Racing",
+    "platform": "Web Browser",
+    "technology": "WebGL, Three.js",
+    "language": "Japanese",
+    "performance": "60fps",
+    "features": {
+      "vehicles": 3,
+      "cameras": 4,
+      "tracks": 1,
+      "laps": 3,
+      "graphics": {
+        "shadows": "4096x4096",
+        "hdr": "ACES Filmic",
+        "particles": true,
+        "fog": true
+      },
+      "physics": {
+        "engine": "Custom",
+        "collision": true,
+        "realistic": true
+      },
+      "ui": {
+        "speedometer": true,
+        "minimap": true,
+        "hud": true,
+        "performance": true
+      }
+    },
+    "requirements": {
+      "webgl": "2.0",
+      "memory": "4GB",
+      "gpu": "Dedicated recommended"
+    }
+  }
+}
