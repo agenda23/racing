@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Racing Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        #speedometer {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 14px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div id="controls">
+                <div>WASD: 移動</div>
+                <div>Space: ブレーキ</div>
+                <div>R: リセット</div>
+                <div>C: カメラ切替</div>
+            </div>
+            <div id="speedometer">
+                Speed: <span id="speed">0</span> km/h
+            </div>
+        </div>
+        <div id="loading">
+            Loading...
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/three@0.155.0/build/three.min.js"></script>
+    <script>
+        // グローバル変数
+        let scene, camera, renderer, car, track;
+        let clock = new THREE.Clock();
+        let keys = {};
+        let gameState = {
+            speed: 0,
+            position: { x: 0, y: 1, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            velocity: { x: 0, y: 0, z: 0 },
+            acceleration: 2000,
+            maxSpeed: 200,
+            brakeForce: 3000,
+            steerAngle: 0,
+            maxSteerAngle: Math.PI / 6
+        };
+
+        // 初期化
+        function init() {
+            try {
+                // シーンの作成
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x87CEEB);
+                scene.fog = new THREE.Fog(0x87CEEB, 100, 300);
+
+                // カメラの作成
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+                // レンダラーの作成
+                const canvas = document.getElementById('gameCanvas');
+                renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+                // ライティング
+                setupLighting();
+
+                // トラックの作成
+                createTrack();
+
+                // 車の作成
+                createCar();
+
+                // イベントリスナー
+                setupEventListeners();
+
+                // ローディング画面を非表示
+                document.getElementById('loading').style.display = 'none';
+
+                // ゲームループ開始
+                animate();
+
+                console.log('3D Racing Game initialized successfully!');
+            } catch (error) {
+                console.error('Failed to initialize game:', error);
+                document.getElementById('loading').innerHTML = 'エラー: ゲームの初期化に失敗しました';
+            }
+        }
+
+        function setupLighting() {
+            // 環境光
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+
+            // 太陽光
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(50, 100, 50);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 200;
+            directionalLight.shadow.camera.left = -100;
+            directionalLight.shadow.camera.right = 100;
+            directionalLight.shadow.camera.top = 100;
+            directionalLight.shadow.camera.bottom = -100;
+            scene.add(directionalLight);
+        }
+
+        function createTrack() {
+            // 地面
+            const groundGeometry = new THREE.PlaneGeometry(500, 500);
+            const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // トラック（楕円形）
+            const trackRadius = 100;
+            const trackWidth = 10;
+            
+            const trackGeometry = new THREE.RingGeometry(
+                trackRadius - trackWidth / 2,
+                trackRadius + trackWidth / 2,
+                32
+            );
+            const trackMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x444444,
+                side: THREE.DoubleSide
+            });
+            
+            track = new THREE.Mesh(trackGeometry, trackMaterial);
+            track.rotation.x = -Math.PI / 2;
+            track.position.y = 0.01;
+            scene.add(track);
+
+            // トラック境界線
+            const innerLineGeometry = new THREE.RingGeometry(
+                trackRadius - trackWidth / 2 - 0.2,
+                trackRadius - trackWidth / 2,
+                64
+            );
+            const lineMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0xffffff,
+                side: THREE.DoubleSide
+            });
+            
+            const innerLine = new THREE.Mesh(innerLineGeometry, lineMaterial);
+            innerLine.rotation.x = -Math.PI / 2;
+            innerLine.position.y = 0.02;
+            scene.add(innerLine);
+
+            const outerLineGeometry = new THREE.RingGeometry(
+                trackRadius + trackWidth / 2,
+                trackRadius + trackWidth / 2 + 0.2,
+                64
+            );
+            
+            const outerLine = new THREE.Mesh(outerLineGeometry, lineMaterial);
+            outerLine.rotation.x = -Math.PI / 2;
+            outerLine.position.y = 0.02;
+            scene.add(outerLine);
+
+            // バリア
+            createBarriers(trackRadius, trackWidth);
+        }
+
+        function createBarriers(trackRadius, trackWidth) {
+            const barrierCount = 64;
+            const barrierMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+            
+            // 内側バリア
+            for (let i = 0; i < barrierCount; i++) {
+                const angle = (i / barrierCount) * Math.PI * 2;
+                const barrierGeometry = new THREE.BoxGeometry(1, 2, 1);
+                const barrier = new THREE.Mesh(barrierGeometry, barrierMaterial);
+                
+                const radius = trackRadius - trackWidth / 2 - 2;
+                barrier.position.x = Math.cos(angle) * radius;
+                barrier.position.z = Math.sin(angle) * radius;
+                barrier.position.y = 1;
+                barrier.castShadow = true;
+                
+                scene.add(barrier);
+            }
+
+            // 外側バリア
+            for (let i = 0; i < barrierCount; i++) {
+                const angle = (i / barrierCount) * Math.PI * 2;
+                const barrierGeometry = new THREE.BoxGeometry(1, 2, 1);
+                const barrier = new THREE.Mesh(barrierGeometry, barrierMaterial);
+                
+                const radius = trackRadius + trackWidth / 2 + 2;
+                barrier.position.x = Math.cos(angle) * radius;
+                barrier.position.z = Math.sin(angle) * radius;
+                barrier.position.y = 1;
+                barrier.castShadow = true;
+                
+                scene.add(barrier);
+            }
+        }
+
+        function createCar() {
+            // 車体
+            const bodyGeometry = new THREE.BoxGeometry(4, 1.5, 2);
+            const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+            car = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            car.position.set(0, 1, -90);
+            car.castShadow = true;
+            scene.add(car);
+
+            // ホイール
+            const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 8);
+            const wheelMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+            
+            const wheelPositions = [
+                { x: -1.5, y: 0.4, z: 1.2 },
+                { x: 1.5, y: 0.4, z: 1.2 },
+                { x: -1.5, y: 0.4, z: -1.2 },
+                { x: 1.5, y: 0.4, z: -1.2 }
+            ];
+            
+            wheelPositions.forEach(pos => {
+                const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+                wheel.position.set(pos.x, pos.y, pos.z);
+                wheel.rotation.z = Math.PI / 2;
+                wheel.castShadow = true;
+                car.add(wheel);
+            });
+
+            // 初期位置設定
+            gameState.position = { x: car.position.x, y: car.position.y, z: car.position.z };
+        }
+
+        function setupEventListeners() {
+            // キーボードイベント
+            document.addEventListener('keydown', (event) => {
+                keys[event.code] = true;
+                if (event.code === 'KeyR') {
+                    resetCar();
+                }
+                if (event.code === 'KeyC') {
+                    // カメラ切替（簡易版）
+                    console.log('Camera switch (not implemented yet)');
+                }
+            });
+
+            document.addEventListener('keyup', (event) => {
+                keys[event.code] = false;
+            });
+
+            // ウィンドウリサイズ
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        function updateInput(deltaTime) {
+            const steerSpeed = 2.0;
+            const steerReturn = 5.0;
+
+            // ステアリング
+            if (keys['KeyA'] || keys['ArrowLeft']) {
+                gameState.steerAngle = Math.min(gameState.steerAngle + steerSpeed * deltaTime, gameState.maxSteerAngle);
+            } else if (keys['KeyD'] || keys['ArrowRight']) {
+                gameState.steerAngle = Math.max(gameState.steerAngle - steerSpeed * deltaTime, -gameState.maxSteerAngle);
+            } else {
+                if (gameState.steerAngle > 0) {
+                    gameState.steerAngle = Math.max(0, gameState.steerAngle - steerReturn * deltaTime);
+                } else if (gameState.steerAngle < 0) {
+                    gameState.steerAngle = Math.min(0, gameState.steerAngle + steerReturn * deltaTime);
+                }
+            }
+        }
+
+        function updatePhysics(deltaTime) {
+            // 現在の速度
+            const currentSpeed = Math.sqrt(
+                gameState.velocity.x * gameState.velocity.x + 
+                gameState.velocity.z * gameState.velocity.z
+            );
+
+            // エンジン力
+            let engineForce = 0;
+            if (keys['KeyW'] || keys['ArrowUp']) {
+                const speedRatio = currentSpeed / (gameState.maxSpeed / 3.6);
+                engineForce = gameState.acceleration * (1 - speedRatio * 0.8);
+            }
+
+            // ブレーキ力
+            let brakeForce = 0;
+            if (keys['KeyS'] || keys['ArrowDown'] || keys['Space']) {
+                brakeForce = gameState.brakeForce;
+            }
+
+            // 車両の向きベクトル
+            const forward = new THREE.Vector3(0, 0, 1);
+            forward.applyEuler(new THREE.Euler(0, gameState.rotation.y, 0));
+
+            // 力の適用
+            if (engineForce > 0) {
+                gameState.velocity.x += forward.x * engineForce * deltaTime / 1000;
+                gameState.velocity.z += forward.z * engineForce * deltaTime / 1000;
+            }
+
+            // ブレーキの適用
+            if (brakeForce > 0) {
+                const brakeDirection = {
+                    x: -gameState.velocity.x,
+                    z: -gameState.velocity.z
+                };
+                const brakeLength = Math.sqrt(brakeDirection.x * brakeDirection.x + brakeDirection.z * brakeDirection.z);
+                if (brakeLength > 0) {
+                    brakeDirection.x /= brakeLength;
+                    brakeDirection.z /= brakeLength;
+                    
+                    gameState.velocity.x += brakeDirection.x * brakeForce * deltaTime / 1000;
+                    gameState.velocity.z += brakeDirection.z * brakeForce * deltaTime / 1000;
+                }
+            }
+
+            // ステアリング
+            if (Math.abs(gameState.steerAngle) > 0.01 && currentSpeed > 0.1) {
+                const turnRate = gameState.steerAngle * currentSpeed * 0.02;
+                gameState.rotation.y += turnRate * deltaTime;
+            }
+
+            // 位置更新
+            gameState.position.x += gameState.velocity.x * deltaTime;
+            gameState.position.z += gameState.velocity.z * deltaTime;
+
+            // 速度減衰
+            gameState.velocity.x *= 0.98;
+            gameState.velocity.z *= 0.98;
+
+            // 速度計算（km/h）
+            gameState.speed = currentSpeed * 3.6;
+        }
+
+        function updateCamera() {
+            // 簡易追従カメラ
+            const followDistance = 15;
+            const followHeight = 8;
+            
+            const carForward = new THREE.Vector3(0, 0, 1);
+            carForward.applyEuler(new THREE.Euler(0, gameState.rotation.y, 0));
+            
+            const targetPosition = new THREE.Vector3(
+                gameState.position.x - carForward.x * followDistance,
+                gameState.position.y + followHeight,
+                gameState.position.z - carForward.z * followDistance
+            );
+            
+            camera.position.lerp(targetPosition, 0.1);
+            
+            const lookAtTarget = new THREE.Vector3(
+                gameState.position.x + carForward.x * 5,
+                gameState.position.y + 2,
+                gameState.position.z + carForward.z * 5
+            );
+            
+            camera.lookAt(lookAtTarget);
+        }
+
+        function updateVisuals() {
+            // 車の位置と回転を更新
+            car.position.set(gameState.position.x, gameState.position.y, gameState.position.z);
+            car.rotation.y = gameState.rotation.y;
+
+            // UI更新
+            document.getElementById('speed').textContent = Math.round(gameState.speed);
+        }
+
+        function resetCar() {
+            gameState.position = { x: 0, y: 1, z: -90 };
+            gameState.rotation = { x: 0, y: Math.PI / 2, z: 0 };
+            gameState.velocity = { x: 0, y: 0, z: 0 };
+            gameState.steerAngle = 0;
+            gameState.speed = 0;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const deltaTime = clock.getDelta();
+
+            // 入力処理
+            updateInput(deltaTime);
+
+            // 物理更新
+            updatePhysics(deltaTime);
+
+            // カメラ更新
+            updateCamera();
+
+            // 視覚更新
+            updateVisuals();
+
+            // レンダリング
+            renderer.render(scene, camera);
+        }
+
+        // ページ読み込み完了時に初期化
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
+
