@@ -178,6 +178,8 @@ dist/
 
 # Local server files
 .serve/
+*.pid
+server.log
 
 # Game assets backup (if created)
 assets_backup/

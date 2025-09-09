@@ -4,9 +4,10 @@
   "description": "高性能 3D レーシングゲーム - WebGL と Three.js を使用したブラウザベースのレーシングゲーム",
   "main": "final-game.html",
   "scripts": {
-    "start": "npx serve .",
-    "dev": "npx serve . --port 8000",
+    "start": "npx serve . --single",
+    "dev": "npx serve . --port 8000 --single", 
     "serve": "python -m http.server 8000",
+    "ultimate": "npx serve . --port 8080 --single && echo 'Open http://localhost:8080/ultimate-game.html'",
     "build": "echo 'No build step required for vanilla JavaScript project'",
     "test": "echo 'No tests specified yet'",
     "lint": "echo 'No linting configured yet'"

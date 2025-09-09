@@ -29,19 +29,37 @@ cd racing-game
 ```
 
 ### 2. ゲームを開始
-**推奨**: `ultimate-game.html` をブラウザで開く（完全版・最新機能搭載）
 
-または、ローカルサーバーで実行:
+#### 🚀 ワンクリック起動（推奨）
 ```bash
-# Python 3の場合
-python -m http.server 8000
+# Unix/Linux/macOS の場合
+./start.sh
 
-# Node.jsの場合
-npx serve .
+# Windows の場合
+start.bat
+```
+
+#### 📁 直接起動
+`ultimate-game.html` をブラウザで直接開く（完全版・最新機能搭載）
+
+#### ⚙️ 手動サーバー起動
+```bash
+# 推奨: npm を使用（プロジェクト設定済み）
+npm start
+# ブラウザで http://localhost:3000/ultimate-game.html にアクセス
+
+# または Python 3を使用
+python -m http.server 8000
+# ブラウザで http://localhost:8000/ultimate-game.html にアクセス
+
+# または serve を直接使用
+npx serve . --single
+# ブラウザで http://localhost:3000/ultimate-game.html にアクセス
 ```
 
 ### 3. プレイ開始
-ブラウザで `http://localhost:8000/ultimate-game.html` にアクセス
+- **推奨**: `npm start` 後、`http://localhost:3000/ultimate-game.html` にアクセス
+- または各サーバーの対応URLにアクセス
 
 #### 📋 ゲームバージョン比較
 | ファイル | レベル | 機能 |
@@ -102,6 +120,8 @@ racing/
 ├── LICENSE                 # ライセンス情報 🆕
 ├── CONTRIBUTING.md         # 貢献ガイド 🆕
 ├── CHANGELOG.md            # 変更履歴 🆕
+├── start.sh                # Unix起動スクリプト 🆕
+├── start.bat               # Windows起動スクリプト 🆕
 └── docs/
     ├── project-analysis.md  # 詳細プロジェクト分析
     ├── Ultimate 3D Racing Game.md # 機能説明書

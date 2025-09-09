@@ -1,0 +1,13 @@
+@echo off
+echo Starting Ultimate 3D Racing Game...
+echo.
+echo Opening local server...
+start /b npx serve . --port 8080 --single
+timeout /t 3 /nobreak > nul
+echo.
+echo Opening game in browser...
+start http://localhost:8080/ultimate-game.html
+echo.
+echo Game started! Press any key to stop server...
+pause > nul
+taskkill /f /im node.exe 2>nul
