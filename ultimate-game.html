@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate 3D Racing Game - Complete Edition</title>
+    <meta name="description" content="高性能3Dレーシングゲーム - 完全版。メニューシステム、音響効果、データ保存機能を含む総合レーシング体験">
+    <meta name="keywords" content="3Dレーシング,ブラウザゲーム,WebGL,Three.js">
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Arial', sans-serif;
+            user-select: none;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        /* HUD要素 */
+        #hud {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.6));
+            padding: 20px;
+            border-radius: 15px;
+            min-width: 280px;
+            border: 2px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            pointer-events: none;
+        }
+        
+        .hud-section {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .hud-section:last-child {
+            margin-bottom: 0;
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        
+        .speedometer {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .speed-gauge {
+            width: 80px;
+            height: 80px;
+            border: 3px solid #333;
+            border-radius: 50%;
+            position: relative;
+            background: radial-gradient(circle, #1a1a1a, #000);
+        }
+        
+        .speed-needle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: 35px;
+            background: #ff4444;
+            transform-origin: bottom center;
+            transform: translate(-50%, -100%) rotate(0deg);
+            transition: transform 0.1s ease;
+        }
+        
+        .speed-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 8px;
+            height: 8px;
+            background: #ff4444;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .lap-indicator {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        
+        .lap-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #333;
+            transition: background 0.3s;
+        }
+        
+        .lap-dot.completed {
+            background: #4CAF50;
+        }
+        
+        .lap-dot.current {
+            background: #FFD700;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 14px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.6));
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            pointer-events: none;
+        }
+        
+        #performance {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 12px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.6));
+            padding: 12px;
+            border-radius: 8px;
+            border: 2px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            pointer-events: none;
+        }
+        
+        #minimap {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.6));
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            pointer-events: none;
+            overflow: hidden;
+        }
+        
+        .minimap-track {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 160px;
+            height: 100px;
+            border: 2px solid #666;
+            border-radius: 50px;
+            transform: translate(-50%, -50%);
+        }
+        
+        .minimap-car {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #ff4444;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.1s ease;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            text-align: center;
+            z-index: 1000;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* レスポンシブ対応 */
+        @media (max-width: 768px) {
+            #hud {
+                font-size: 14px;
+                padding: 15px;
+                min-width: 220px;
+                bottom: 10px;
+                right: 10px;
+            }
+            
+            #controls {
+                font-size: 12px;
+                padding: 10px;
+                top: 10px;
+                left: 10px;
+            }
+            
+            #performance {
+                font-size: 10px;
+                padding: 8px;
+                top: 10px;
+                right: 10px;
+            }
+            
+            #minimap {
+                width: 150px;
+                height: 150px;
+                bottom: 10px;
+                left: 10px;
+            }
+        }
+        
+        /* アニメーション効果 */
+        .fade-in {
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .pulse {
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* アクセシビリティ */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="ui">
+            <!-- 操作ガイド -->
+            <div id="controls" class="fade-in">
+                <h3 style="margin: 0 0 10px 0; color: #4CAF50;">🎮 操作方法</h3>
+                <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px; font-size: 12px;">
+                    <div>W/↑</div><div>加速</div>
+                    <div>S/↓</div><div>減速・バック</div>
+                    <div>A/←</div><div>左ステアリング</div>
+                    <div>D/→</div><div>右ステアリング</div>
+                    <div>Space</div><div>ハンドブレーキ</div>
+                    <div>R</div><div>リセット</div>
+                    <div>C</div><div>カメラ切替</div>
+                    <div>Q/E</div><div>ギア↓/↑</div>
+                    <div>T</div><div>AT/MT切替</div>
+                    <div>Left Shift</div><div>クラッチ</div>
+                    <div>ESC</div><div>メニュー</div>
+                </div>
+            </div>
+            
+            <!-- パフォーマンス情報 -->
+            <div id="performance" class="fade-in">
+                <div style="color: #4CAF50; font-weight: bold; margin-bottom: 5px;">📊 パフォーマンス</div>
+                <div>FPS: <span id="fpsDisplay">60</span></div>
+                <div>三角形: <span id="trianglesDisplay">0</span></div>
+                <div>描画コール: <span id="drawCallsDisplay">0</span></div>
+                <div>カメラ: <span id="cameraModeDisplay">Follow</span></div>
+            </div>
+            
+            <!-- メインHUD -->
+            <div id="hud" class="fade-in">
+                <div class="hud-section">
+                    <div class="speedometer">
+                        <div class="speed-gauge">
+                            <div class="speed-needle" id="speedNeedle"></div>
+                            <div class="speed-center"></div>
+                        </div>
+                        <div>
+                            <div style="font-size: 24px; color: #FFD700;">
+                                <span id="speed">0</span> <span style="font-size: 14px;">km/h</span>
+                            </div>
+                            <div style="font-size: 14px; color: #888;">
+                                ギア: <span id="gearDisplay">1</span> <span id="transmissionMode" style="color: #4CAF50;">[AT]</span> | RPM: <span id="rpm">800</span>
+                            </div>
+                            <div style="font-size: 12px; color: #666; margin-top: 2px;">
+                                <span id="clutchDisplay">クラッチ: 100%</span> | <span id="shiftingIndicator"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="hud-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="color: #4CAF50;">ラップ: <span id="currentLap">1</span> / <span id="totalLaps">3</span></div>
+                            <div class="lap-indicator" id="lapIndicator">
+                                <div class="lap-dot current"></div>
+                                <div class="lap-dot"></div>
+                                <div class="lap-dot"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="hud-section">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
+                        <div>現在: <span id="currentTime" style="color: #FFD700;">0:00.00</span></div>
+                        <div>ベスト: <span id="bestTime" style="color: #4CAF50;">--:--</span></div>
+                        <div>ラップ: <span id="lapTime" style="color: #2196F3;">0:00.00</span></div>
+                        <div>前回: <span id="lastLap" style="color: #888;">--:--</span></div>
+                    </div>
+                </div>
+                
+                <div class="hud-section" style="border-bottom: none;">
+                    <div style="margin-bottom: 5px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                            <span>スピード</span>
+                            <span id="speedPercentage">0%</span>
+                        </div>
+                        <div style="background: #333; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div id="speedBar" style="background: linear-gradient(90deg, #4CAF50, #FFD700, #ff4444); height: 100%; width: 0%; transition: width 0.2s;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ミニマップ -->
+            <div id="minimap" class="fade-in">
+                <div style="color: white; font-size: 12px; padding: 8px; text-align: center; background: rgba(0,0,0,0.5);">
+                    📍 コース位置
+                </div>
+                <div class="minimap-track">
+                    <div class="minimap-car" id="minimapCar"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ローディング画面 -->
+        <div id="loading">
+            <div class="loading-spinner"></div>
+            <div>ゲームを読み込み中...</div>
+            <div style="font-size: 14px; color: #888; margin-top: 10px;">
+                Ultimate 3D Racing Game - Complete Edition
+            </div>
+        </div>
+    </div>
+
+    <!-- アクセシビリティ用隠しテキスト -->
+    <div class="sr-only" aria-live="polite" id="screenReader"></div>
+
+    <!-- Three.js -->
+    <script src="three.js"></script>
+    
+    <!-- 新規追加システム -->
+    <script src="errorHandler.js"></script>
+    <script src="audioSystem.js"></script>
+    <script src="dataManager.js"></script>
+    <script src="gameStateManager.js"></script>
+    
+    <!-- ゲームコアシステム -->
+    <script src="utils.js"></script>
+    <script src="physics.js"></script>
+    <script src="car.js"></script>
+    <script src="track.js"></script>
+    <script src="camera.js"></script>
+    <script src="game.js"></script>
+    <script src="main.js"></script>
+    
+    <script>
+        // グローバル変数
+        let game = null;
+        let gameStateManager = null;
+        let isGameInitialized = false;
+        
+        // 初期化メイン関数
+        async function initializeGame() {
+            try {
+                // 互換性チェック
+                const compatibilityIssues = window.compatibilityChecker.checkCompatibility();
+                
+                if (compatibilityIssues.some(issue => issue.severity === 'critical')) {
+                    throw new Error('ブラウザが対応していません');
+                }
+                
+                // ゲーム状態マネージャーの初期化
+                gameStateManager = new GameStateManager();
+                
+                // メインゲームの初期化
+                game = new Game();
+                gameStateManager.game = game;
+                
+                // オーディオシステムの初期化
+                await window.audioManager.resumeContext();
+                
+                // パフォーマンス監視開始
+                window.errorHandler.startPerformanceMonitoring();
+                
+                // UI更新の開始
+                startUIUpdates();
+                
+                // ローディング画面を非表示
+                document.getElementById('loading').style.display = 'none';
+                
+                // メニュー状態に設定
+                gameStateManager.setState('menu');
+                
+                isGameInitialized = true;
+                console.log('Game initialized successfully');
+                
+            } catch (error) {
+                console.error('Failed to initialize game:', error);
+                window.errorHandler.handleError({
+                    type: 'Initialization Error',
+                    message: error.message,
+                    severity: 'critical'
+                });
+            }
+        }
+        
+        // UI更新ループ
+        function startUIUpdates() {
+            function updateUI() {
+                if (game && isGameInitialized) {
+                    updateHUD();
+                    updatePerformanceDisplay();
+                    updateMinimap();
+                }
+                requestAnimationFrame(updateUI);
+            }
+            updateUI();
+        }
+        
+        // HUD更新
+        function updateHUD() {
+            if (!game.car) return;
+            
+            const speed = Math.round(game.car.speed || 0);
+            const rpm = Math.round(game.car.rpm || 800);
+            const gear = game.car.gear || 1;
+            const maxSpeed = game.car.maxSpeed || 280;
+            
+            // スピードメーター
+            document.getElementById('speed').textContent = speed;
+            document.getElementById('rpm').textContent = rpm;
+            
+            // ギア表示の更新
+            updateGearDisplay(gear, game.car);
+            
+            // スピードゲージ（針）
+            const speedNeedle = document.getElementById('speedNeedle');
+            const speedPercentage = Math.min(speed / maxSpeed, 1);
+            const needleRotation = speedPercentage * 180 - 90; // -90度から90度
+            speedNeedle.style.transform = `translate(-50%, -100%) rotate(${needleRotation}deg)`;
+            
+            // スピードバー
+            document.getElementById('speedBar').style.width = `${speedPercentage * 100}%`;
+            document.getElementById('speedPercentage').textContent = `${Math.round(speedPercentage * 100)}%`;
+            
+            // ラップ情報
+            if (game.gameState) {
+                document.getElementById('currentLap').textContent = game.gameState.currentLap || 1;
+                document.getElementById('totalLaps').textContent = game.gameState.totalLaps || 3;
+                
+                // タイム表示
+                document.getElementById('currentTime').textContent = formatTime(game.gameState.totalTime || 0);
+                document.getElementById('lapTime').textContent = formatTime(game.gameState.lapTime || 0);
+                
+                const bestTime = window.dataManager.getBestTime(game.car.vehicleType);
+                document.getElementById('bestTime').textContent = bestTime ? formatTime(bestTime) : '--:--';
+                
+                if (game.gameState.lastLapTime) {
+                    document.getElementById('lastLap').textContent = formatTime(game.gameState.lastLapTime);
+                }
+                
+                // ラップインジケーター
+                updateLapIndicator(game.gameState.currentLap, game.gameState.totalLaps);
+            }
+        }
+        
+        // パフォーマンス表示更新
+        function updatePerformanceDisplay() {
+            if (game.performanceMonitor) {
+                document.getElementById('fpsDisplay').textContent = Math.round(game.performanceMonitor.fps || 0);
+                document.getElementById('trianglesDisplay').textContent = game.renderer.info.render.triangles || 0;
+                document.getElementById('drawCallsDisplay').textContent = game.renderer.info.render.calls || 0;
+            }
+            
+            if (game.cameraController) {
+                const modes = ['Follow', 'Chase', 'Cockpit', 'Overhead'];
+                document.getElementById('cameraModeDisplay').textContent = modes[game.cameraController.currentMode] || 'Unknown';
+            }
+        }
+        
+        // ミニマップ更新
+        function updateMinimap() {
+            if (!game.car || !game.car.mesh) return;
+            
+            const car = game.car.mesh;
+            const minimapCar = document.getElementById('minimapCar');
+            
+            // トラック中心からの相対位置を計算
+            const trackRadius = 120;
+            const minimapRadius = 80;
+            
+            const x = (car.position.x / trackRadius) * minimapRadius;
+            const z = (car.position.z / trackRadius) * minimapRadius;
+            
+            minimapCar.style.left = `${100 + x}px`;
+            minimapCar.style.top = `${100 + z}px`;
+        }
+        
+        // ラップインジケーター更新
+        function updateLapIndicator(currentLap, totalLaps) {
+            const indicator = document.getElementById('lapIndicator');
+            indicator.innerHTML = '';
+            
+            for (let i = 1; i <= totalLaps; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'lap-dot';
+                
+                if (i < currentLap) {
+                    dot.classList.add('completed');
+                } else if (i === currentLap) {
+                    dot.classList.add('current');
+                }
+                
+                indicator.appendChild(dot);
+            }
+        }
+        
+        // 時間フォーマット
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes}:${remainingSeconds.toFixed(2).padStart(5, '0')}`;
+        }
+        
+        // ギア表示更新
+        function updateGearDisplay(gear, car) {
+            // ギア表示
+            let gearText = gear;
+            if (gear === -1) gearText = 'R';
+            else if (gear === 0) gearText = 'N';
+            
+            document.getElementById('gearDisplay').textContent = gearText;
+            
+            // トランスミッションモード表示
+            const modeElement = document.getElementById('transmissionMode');
+            if (car.isAutomatic) {
+                modeElement.textContent = '[AT]';
+                modeElement.style.color = '#4CAF50';
+            } else {
+                modeElement.textContent = '[MT]';
+                modeElement.style.color = '#FF9800';
+            }
+            
+            // クラッチ表示（マニュアル時のみ）
+            const clutchElement = document.getElementById('clutchDisplay');
+            if (car.isAutomatic) {
+                clutchElement.style.display = 'none';
+            } else {
+                clutchElement.style.display = 'inline';
+                const clutchPercentage = Math.round(car.clutch * 100);
+                clutchElement.textContent = `クラッチ: ${clutchPercentage}%`;
+                clutchElement.style.color = clutchPercentage < 50 ? '#ff4444' : '#4CAF50';
+            }
+            
+            // ギアチェンジ中表示
+            const shiftingElement = document.getElementById('shiftingIndicator');
+            if (car.isShifting) {
+                shiftingElement.textContent = '⚡ ギアチェンジ中';
+                shiftingElement.style.color = '#FFD700';
+            } else {
+                shiftingElement.textContent = '';
+            }
+        }
+        
+        // キーボードイベント
+        document.addEventListener('keydown', (event) => {
+            if (!isGameInitialized) return;
+            
+            // ESCキーでメニュー切替
+            if (event.code === 'Escape') {
+                if (gameStateManager.currentState === 'playing') {
+                    gameStateManager.setState('paused');
+                } else if (gameStateManager.currentState === 'paused') {
+                    gameStateManager.setState('playing');
+                }
+                event.preventDefault();
+            }
+            
+            // 音声再生（ユーザーインタラクション後）
+            window.audioManager.resumeContext();
+        });
+        
+        // ウィンドウリサイズ対応
+        window.addEventListener('resize', () => {
+            if (game && game.renderer) {
+                game.renderer.setSize(window.innerWidth, window.innerHeight);
+                if (game.camera) {
+                    game.camera.aspect = window.innerWidth / window.innerHeight;
+                    game.camera.updateProjectionMatrix();
+                }
+            }
+        });
+        
+        // ページ離脱時の確認
+        window.addEventListener('beforeunload', (event) => {
+            if (isGameInitialized && gameStateManager.currentState === 'playing') {
+                event.preventDefault();
+                event.returnValue = 'レース中です。本当にページを離れますか？';
+            }
+        });
+        
+        // ページの可視性変更時の処理
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && gameStateManager && gameStateManager.currentState === 'playing') {
+                gameStateManager.setState('paused');
+            }
+        });
+        
+        // 初期化開始
+        document.addEventListener('DOMContentLoaded', () => {
+            // 少し遅延してから初期化（UIの準備を待つ）
+            setTimeout(initializeGame, 500);
+        });
+        
+        // グローバルアクセス用
+        window.game = game;
+        window.gameStateManager = gameStateManager;
+    </script>
+</body>
+</html>

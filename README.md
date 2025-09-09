@@ -29,8 +29,9 @@ cd racing-game
 ```
 
 ### 2. ゲームを開始
-- `final-game.html` をブラウザで開く
-- または、ローカルサーバーで実行:
+**推奨**: `ultimate-game.html` をブラウザで開く（完全版・最新機能搭載）
+
+または、ローカルサーバーで実行:
 ```bash
 # Python 3の場合
 python -m http.server 8000
@@ -40,7 +41,16 @@ npx serve .
 ```
 
 ### 3. プレイ開始
-ブラウザで `http://localhost:8000/final-game.html` にアクセス
+ブラウザで `http://localhost:8000/ultimate-game.html` にアクセス
+
+#### 📋 ゲームバージョン比較
+| ファイル | レベル | 機能 |
+|---------|--------|------|
+| `ultimate-game.html` | ★★★★★ | 完全版：メニュー、音響、データ保存、エラーハンドリング |
+| `final-game.html` | ★★★★☆ | 高機能版：3Dグラフィックス、物理エンジン |
+| `enhanced-game.html` | ★★★☆☆ | 拡張版：基本機能＋高級グラフィックス |
+| `simple-game.html` | ★★☆☆☆ | シンプル版：基本的なゲームプレイ |
+| `index.html` | ★☆☆☆☆ | プロトタイプ：基本3Dシーン |
 
 ## 🎮 操作方法
 
@@ -55,6 +65,9 @@ npx serve .
 | `R` | 車両リセット |
 | `C` | カメラモード切替 |
 | `V` | 視点切替 |
+| `Q` / `E` | ギアダウン / ギアアップ (MT時) |
+| `T` | オートマチック/マニュアル切替 |
+| `Left Shift` | クラッチ (MT時) |
 | `1-3` | 車両選択 |
 
 ### カメラモード
@@ -68,7 +81,8 @@ npx serve .
 ```
 racing/
 ├── README.md                 # このファイル
-├── final-game.html          # 完成版ゲーム (推奨)
+├── ultimate-game.html       # 完全版ゲーム (最新・推奨) 🆕
+├── final-game.html          # 完成版ゲーム
 ├── enhanced-game.html       # 拡張版
 ├── simple-game.html         # シンプル版
 ├── index.html              # 基本版
@@ -80,6 +94,14 @@ racing/
 ├── utils.js                # ユーティリティ
 ├── main.js                 # 初期化処理
 ├── three.js                # Three.js ライブラリ
+├── gameStateManager.js     # ゲーム状態管理 🆕
+├── audioSystem.js          # 音響システム 🆕
+├── dataManager.js          # データ永続化 🆕
+├── errorHandler.js         # エラーハンドリング 🆕
+├── package.json            # プロジェクト設定 🆕
+├── LICENSE                 # ライセンス情報 🆕
+├── CONTRIBUTING.md         # 貢献ガイド 🆕
+├── CHANGELOG.md            # 変更履歴 🆕
 └── docs/
     ├── project-analysis.md  # 詳細プロジェクト分析
     ├── Ultimate 3D Racing Game.md # 機能説明書

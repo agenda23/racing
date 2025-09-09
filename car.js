@@ -19,13 +19,35 @@ class Car extends PhysicsObject {
             accelerate: false,
             brake: false,
             steerLeft: false,
-            steerRight: false
+            steerRight: false,
+            shiftUp: false,
+            shiftDown: false,
+            toggleTransmission: false,
+            clutch: false
         };
         
         // 車両の状態
         this.speed = 0; // 現在の速度 (km/h)
         this.rpm = 800; // エンジンRPM
         this.gear = 1; // ギア
+        
+        // ギアシステム
+        this.maxGear = 6; // 最大ギア数
+        this.minGear = 1; // 最小ギア（リバースは-1）
+        this.isAutomatic = true; // オートマチック/マニュアル切替
+        this.gearRatios = [
+            -2.5, // リバース (gear = -1)
+            0,    // ニュートラル (gear = 0) 
+            3.5,  // 1速 (gear = 1)
+            2.2,  // 2速 (gear = 2)
+            1.7,  // 3速 (gear = 3)
+            1.3,  // 4速 (gear = 4)
+            1.0,  // 5速 (gear = 5)
+            0.8   // 6速 (gear = 6)
+        ];
+        this.clutch = 1.0; // クラッチ接続度（0-1）
+        this.gearChangeTimer = 0; // ギアチェンジ中のタイマー
+        this.isShifting = false; // ギアチェンジ中フラグ
         
         this.createCarMesh();
         this.setupPhysics();
@@ -76,6 +98,7 @@ class Car extends PhysicsObject {
     
     update(deltaTime) {
         this.handleInput(deltaTime);
+        this.updateGearSystem(deltaTime);
         this.updatePhysics(deltaTime);
         this.updateVisuals(deltaTime);
         this.updateSpeed();
@@ -105,6 +128,128 @@ class Car extends PhysicsObject {
                 wheel.steerAngle = this.steerAngle;
             }
         });
+        
+        // ギア操作処理
+        this.handleGearInput();
+    }
+    
+    // ギア操作の処理
+    handleGearInput() {
+        // トランスミッションモード切替
+        if (this.input.toggleTransmission && !this.wasTogglePressed) {
+            this.isAutomatic = !this.isAutomatic;
+            if (window.audioManager) {
+                window.audioManager.playSound('click');
+            }
+            if (window.notificationSystem) {
+                const mode = this.isAutomatic ? 'オートマチック' : 'マニュアル';
+                window.notificationSystem.show(`${mode}モードに切り替えました`, 'info', 2000);
+            }
+        }
+        this.wasTogglePressed = this.input.toggleTransmission;
+        
+        // マニュアルモードでのギア操作
+        if (!this.isAutomatic && !this.isShifting) {
+            if (this.input.shiftUp && !this.wasShiftUpPressed) {
+                this.shiftUp();
+            }
+            if (this.input.shiftDown && !this.wasShiftDownPressed) {
+                this.shiftDown();
+            }
+        }
+        
+        this.wasShiftUpPressed = this.input.shiftUp;
+        this.wasShiftDownPressed = this.input.shiftDown;
+    }
+    
+    // ギアシステムの更新
+    updateGearSystem(deltaTime) {
+        // ギアチェンジ中の処理
+        if (this.isShifting) {
+            this.gearChangeTimer += deltaTime;
+            // ギアチェンジ中はクラッチを切る
+            this.clutch = Math.max(0, 1 - (this.gearChangeTimer * 4));
+            
+            // ギアチェンジ完了判定
+            if (this.gearChangeTimer >= 0.3) {
+                this.isShifting = false;
+                this.gearChangeTimer = 0;
+                this.clutch = 1.0;
+            }
+        }
+        
+        // オートマチックモードでの自動ギア変速
+        if (this.isAutomatic && !this.isShifting) {
+            this.autoShift();
+        }
+        
+        // クラッチ操作（マニュアルモード時）
+        if (!this.isAutomatic) {
+            if (this.input.clutch) {
+                this.clutch = Math.max(0, this.clutch - deltaTime * 3);
+            } else if (!this.isShifting) {
+                this.clutch = Math.min(1, this.clutch + deltaTime * 2);
+            }
+        }
+    }
+    
+    // ギアアップ
+    shiftUp() {
+        if (this.gear < this.maxGear && !this.isShifting) {
+            if (this.gear === -1) {
+                this.gear = 0; // リバースからニュートラル
+            } else if (this.gear === 0) {
+                this.gear = 1; // ニュートラルから1速
+            } else {
+                this.gear++; // 通常のギアアップ
+            }
+            this.startGearChange();
+        }
+    }
+    
+    // ギアダウン
+    shiftDown() {
+        if (this.gear > -1 && !this.isShifting) {
+            if (this.gear === 1) {
+                this.gear = 0; // 1速からニュートラル
+            } else if (this.gear === 0) {
+                this.gear = -1; // ニュートラルからリバース
+            } else {
+                this.gear--; // 通常のギアダウン
+            }
+            this.startGearChange();
+        }
+    }
+    
+    // ギアチェンジ開始
+    startGearChange() {
+        this.isShifting = true;
+        this.gearChangeTimer = 0;
+        
+        // 音響効果
+        if (window.audioManager) {
+            window.audioManager.playSound('gearshift');
+        }
+    }
+    
+    // オートマチック変速制御
+    autoShift() {
+        const currentSpeedKmh = this.speed;
+        const currentRpm = this.rpm;
+        
+        // アップシフト条件
+        if (this.gear < this.maxGear && currentRpm > 6000) {
+            this.shiftUp();
+        }
+        // ダウンシフト条件  
+        else if (this.gear > 1 && currentRpm < 2000 && currentSpeedKmh > 10) {
+            this.shiftDown();
+        }
+        
+        // 停車時は1速に戻す
+        if (currentSpeedKmh < 5 && this.gear > 1) {
+            this.gear = 1;
+        }
     }
     
     updatePhysics(deltaTime) {
@@ -117,9 +262,19 @@ class Car extends PhysicsObject {
         
         // エンジン力の計算
         let engineForce = 0;
-        if (this.input.accelerate) {
+        if (this.input.accelerate && this.gear !== 0) {
+            // ギア比を取得（配列のインデックス調整）
+            const gearRatio = this.getGearRatio(this.gear);
             const speedRatio = currentSpeed / (this.maxSpeed / 3.6); // km/h to m/s
-            engineForce = this.enginePower * (1 - speedRatio * 0.8);
+            
+            // クラッチ接続度とギア比を考慮
+            const baseForce = this.enginePower * (1 - speedRatio * 0.6);
+            engineForce = baseForce * Math.abs(gearRatio) * this.clutch;
+            
+            // リバース時は後進
+            if (this.gear === -1) {
+                engineForce = -engineForce;
+            }
         }
         
         // ブレーキ力の計算
@@ -202,9 +357,42 @@ class Car extends PhysicsObject {
         );
         this.speed = velocityMagnitude * 3.6; // m/s to km/h
         
-        // RPMの計算（簡易版）
-        this.rpm = 800 + (this.speed * 30);
-        this.rpm = Utils.clamp(this.rpm, 800, 7000);
+        // RPMの計算（ギア比を考慮）
+        this.updateRPM();
+    }
+    
+    // RPM更新（ギア比ベース）
+    updateRPM() {
+        const idleRPM = 800;
+        const maxRPM = 7500;
+        
+        if (this.gear === 0) {
+            // ニュートラル時はアイドル回転
+            this.rpm = idleRPM;
+        } else {
+            const gearRatio = Math.abs(this.getGearRatio(this.gear));
+            // 速度とギア比からRPMを計算
+            const speedBasedRPM = idleRPM + (this.speed * gearRatio * 15);
+            
+            // アクセル時はRPMが上がりやすく
+            if (this.input.accelerate) {
+                const targetRPM = Math.min(maxRPM, speedBasedRPM * 1.2);
+                this.rpm = Utils.lerp(this.rpm, targetRPM, 0.1);
+            } else {
+                // エンジンブレーキ効果
+                const targetRPM = Math.max(idleRPM, speedBasedRPM * 0.8);
+                this.rpm = Utils.lerp(this.rpm, targetRPM, 0.05);
+            }
+        }
+        
+        this.rpm = Utils.clamp(this.rpm, idleRPM, maxRPM);
+    }
+    
+    // ギア比取得ヘルパー関数
+    getGearRatio(gear) {
+        // 配列インデックスに変換（gear -1 → index 0, gear 0 → index 1, etc.）
+        const index = gear + 1;
+        return this.gearRatios[index] || 1.0;
     }
     
     // 車両をリセット
@@ -215,6 +403,10 @@ class Car extends PhysicsObject {
         this.steerAngle = 0;
         this.speed = 0;
         this.rpm = 800;
+        this.gear = 1;
+        this.clutch = 1.0;
+        this.isShifting = false;
+        this.gearChangeTimer = 0;
     }
     
     // 入力の設定

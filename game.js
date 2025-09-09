@@ -185,6 +185,24 @@ class Game {
             case 'KeyR':
                 this.resetGame();
                 break;
+            case 'KeyQ':
+                // ギアダウン
+                if (this.car) {
+                    this.car.setInput({ shiftDown: true });
+                }
+                break;
+            case 'KeyE':
+                // ギアアップ
+                if (this.car) {
+                    this.car.setInput({ shiftUp: true });
+                }
+                break;
+            case 'KeyT':
+                // トランスミッションモード切替
+                if (this.car) {
+                    this.car.setInput({ toggleTransmission: true });
+                }
+                break;
             case 'KeyP':
             case 'Escape':
                 this.togglePause();
@@ -287,7 +305,11 @@ class Game {
             accelerate: this.inputManager.keys['KeyW'] || this.inputManager.keys['ArrowUp'],
             brake: this.inputManager.keys['KeyS'] || this.inputManager.keys['ArrowDown'] || this.inputManager.keys['Space'],
             steerLeft: this.inputManager.keys['KeyA'] || this.inputManager.keys['ArrowLeft'],
-            steerRight: this.inputManager.keys['KeyD'] || this.inputManager.keys['ArrowRight']
+            steerRight: this.inputManager.keys['KeyD'] || this.inputManager.keys['ArrowRight'],
+            shiftUp: this.inputManager.keys['KeyE'],
+            shiftDown: this.inputManager.keys['KeyQ'],
+            toggleTransmission: this.inputManager.keys['KeyT'],
+            clutch: this.inputManager.keys['ShiftLeft']
         };
         
         this.car.setInput(input);
