@@ -677,14 +677,17 @@
         
         // 初期化開始
         window.addEventListener('load', () => {
-            // THREE.jsの読み込み完了を確実にするため遅延
-            setTimeout(() => {
-                if (typeof THREE === 'undefined') {
-                    console.error('THREE.js not loaded');
-                    return;
+            // THREE.jsの読み込み完了を確認
+            function checkThreeJs() {
+                if (typeof THREE !== 'undefined') {
+                    console.log('✅ THREE.js loaded successfully');
+                    initializeGame();
+                } else {
+                    console.log('⏳ Waiting for THREE.js...');
+                    setTimeout(checkThreeJs, 100);
                 }
-                initializeGame();
-            }, 1000);
+            }
+            checkThreeJs();
         });
         
         // グローバルアクセス用
