@@ -402,6 +402,9 @@
     <!-- Three.js -->
     <script src="three.js"></script>
     
+    <!-- WebGL診断システム -->
+    <script src="webglDiagnostic.js"></script>
+    
     <!-- 新規追加システム -->
     <script src="errorHandler.js"></script>
     <script src="audioSystem.js"></script>
@@ -439,6 +442,9 @@
                 // メインゲームの初期化
                 game = new Game();
                 gameStateManager.game = game;
+                
+                // ゲーム初期化完了を待機
+                await game.initPromise;
                 
                 // オーディオシステムの初期化
                 await window.audioManager.resumeContext();

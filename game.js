@@ -40,37 +40,261 @@ class Game {
         this.clock = new THREE.Clock();
         this.lastTime = 0;
         
-        this.initialize();
+        // 初期化は非同期で実行
+        this.initPromise = this.initialize();
     }
     
-    initialize() {
-        this.setupRenderer();
-        this.setupScene();
-        this.setupLighting();
-        this.setupGameObjects();
-        this.setupEventListeners();
-        this.setupUI();
+    async initialize() {
+        try {
+            await this.setupRenderer();
+            this.setupScene();
+            this.setupLighting();
+                this.setupGameObjects();
+            this.setupEventListeners();
+            this.setupUI();
+            
+            // ゲーム開始
+            this.startGame();
+            
+            console.log('✅ ゲーム初期化完了');
+        } catch (error) {
+            console.error('❌ ゲーム初期化エラー:', error);
+            this.showErrorMessage('ゲームの初期化に失敗しました: ' + error.message);
+        }
+    }
+    
+    async setupRenderer() {
+        // WebGL診断実行
+        const diagnostic = new WebGLDiagnostic();
+        const diagnosticResult = await diagnostic.runDiagnostic();
         
-        // ゲーム開始
-        this.startGame();
+        console.log('🔍 WebGL診断結果:', diagnosticResult);
+        
+        // 診断結果を確認
+        if (!diagnosticResult.supported || diagnosticResult.errors.length > 0) {
+            const userMessage = diagnostic.getUserMessage();
+            this.handleWebGLError(userMessage, diagnosticResult);
+            throw new Error('WebGL initialization failed');
+        }
+        
+        // WebGL警告がある場合は通知
+        if (diagnosticResult.warnings.length > 0) {
+            const userMessage = diagnostic.getUserMessage();
+            this.showWebGLWarning(userMessage);
+        }
+        
+        // レンダラー設定を診断結果に基づいて最適化
+        const rendererOptions = this.getOptimizedRendererOptions(diagnosticResult);
+        
+        try {
+            this.renderer = new THREE.WebGLRenderer(rendererOptions);
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            
+            // 診断結果に基づいて機能を調整
+            this.configureRendererFeatures(diagnosticResult);
+            
+            // パフォーマンス設定
+            this.renderer.info.autoReset = false;
+            
+            console.log('✅ WebGLレンダラー初期化成功');
+            
+        } catch (error) {
+            console.error('WebGLレンダラー作成エラー:', error);
+            
+            // フォールバック試行
+            await this.attemptWebGLFallback(diagnosticResult);
+        }
     }
     
-    setupRenderer() {
+    // 診断結果に基づくレンダラーオプション最適化
+    getOptimizedRendererOptions(diagnosticResult) {
         const canvas = document.getElementById('gameCanvas');
-        this.renderer = new THREE.WebGLRenderer({ 
+        const baseOptions = {
             canvas: canvas,
-            antialias: true,
-            powerPreference: "high-performance"
-        });
+            alpha: false
+        };
         
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // パフォーマンス最適化
-        this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // 低性能環境での最適化
+        if (diagnosticResult.maxTextureSize < 4096 || 
+            diagnosticResult.warnings.some(w => w.includes('ソフトウェア'))) {
+            
+            console.log('⚠️ 低性能環境を検出、設定を最適化します');
+            return {
+                ...baseOptions,
+                antialias: false,
+                powerPreference: "default",
+                precision: "mediump",
+                preserveDrawingBuffer: false
+            };
+        }
+        
+        // 高性能環境での設定
+        return {
+            ...baseOptions,
+            antialias: true,
+            powerPreference: "high-performance",
+            precision: "highp",
+            preserveDrawingBuffer: false
+        };
+    }
+    
+    // レンダラー機能設定
+    configureRendererFeatures(diagnosticResult) {
+        // シャドウマッピング
+        const hasGoodPerformance = diagnosticResult.maxTextureSize >= 4096 &&
+                                  !diagnosticResult.warnings.some(w => w.includes('ソフトウェア'));
+        
+        if (hasGoodPerformance) {
+            this.renderer.shadowMap.enabled = true;
+            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            console.log('✅ 高品質シャドウマッピング有効');
+        } else {
+            console.log('⚠️ 低性能環境のためシャドウマッピングを無効化');
+            this.renderer.shadowMap.enabled = false;
+        }
+        
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         
-        // パフォーマンス設定
-        this.renderer.info.autoReset = false;
+        // 診断結果をゲームオブジェクトに保存
+        this.webglDiagnostic = diagnosticResult;
+    }
+    
+    // WebGLフォールバック試行
+    async attemptWebGLFallback(diagnosticResult) {
+        console.log('🔧 WebGLフォールバックを試行します...');
+        
+        // WebGL修復を試行
+        await WebGLDiagnostic.attemptRepair();
+        
+        // 最低限の設定で再試行
+        try {
+            const canvas = document.getElementById('gameCanvas');
+            this.renderer = new THREE.WebGLRenderer({
+                canvas: canvas,
+                alpha: false,
+                antialias: false,
+                precision: "lowp",
+                powerPreference: "default"
+            });
+            
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.shadowMap.enabled = false;
+            
+            console.log('✅ フォールバックモードでWebGL初期化成功');
+            
+            // 低品質モード通知
+            if (window.notificationSystem) {
+                window.notificationSystem.show(
+                    '⚠️ 低品質モードで動作しています', 
+                    'warning', 
+                    3000
+                );
+            }
+            
+        } catch (fallbackError) {
+            console.error('❌ フォールバックも失敗:', fallbackError);
+            this.handleWebGLError({
+                type: 'error',
+                title: 'WebGL初期化完全失敗',
+                message: 'WebGLの初期化に完全に失敗しました。ブラウザまたはシステムの問題の可能性があります。',
+                actions: ['ブラウザを再起動', 'システムを再起動', 'グラフィックドライバを更新']
+            }, diagnosticResult);
+            
+            throw new Error('WebGL fallback failed');
+        }
+    }
+    
+    // WebGLエラーハンドリング
+    handleWebGLError(userMessage, diagnosticResult) {
+        console.error('❌ WebGL初期化失敗:', diagnosticResult);
+        
+        // エラーハンドラーに詳細情報を送信
+        if (window.errorHandler) {
+            window.errorHandler.handleError({
+                type: 'WebGL Initialization Error',
+                message: userMessage.message,
+                severity: 'critical',
+                details: diagnosticResult
+            });
+        }
+        
+        // ユーザーへの詳細説明モーダル表示
+        this.showWebGLErrorModal(userMessage, diagnosticResult);
+    }
+    
+    // WebGL警告表示
+    showWebGLWarning(userMessage) {
+        console.warn('⚠️ WebGL警告:', userMessage.message);
+        
+        if (window.notificationSystem) {
+            window.notificationSystem.show(
+                `⚠️ ${userMessage.message}`, 
+                'warning', 
+                5000
+            );
+        }
+    }
+    
+    // WebGLエラーモーダル表示
+    showWebGLErrorModal(userMessage, diagnosticResult) {
+        const modal = document.createElement('div');
+        modal.id = 'webgl-error-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+            font-family: Arial, sans-serif;
+        `;
+        
+        modal.innerHTML = `
+            <div style="background: #1a1a1a; color: white; padding: 2rem; border-radius: 10px; max-width: 600px; max-height: 80vh; overflow-y: auto; text-align: center;">
+                <h2 style="color: #ff4444; margin-bottom: 1rem;">🚨 ${userMessage.title}</h2>
+                <p style="margin-bottom: 1.5rem; font-size: 16px; line-height: 1.4;">${userMessage.message}</p>
+                
+                <div style="text-align: left; background: #2a2a2a; padding: 1rem; border-radius: 5px; margin: 1rem 0; font-size: 14px;">
+                    <strong>📊 診断情報:</strong><br>
+                    <div style="margin: 0.5rem 0;">
+                        ブラウザ: ${navigator.userAgent.split(' ').slice(0, 2).join(' ')}<br>
+                        WebGL対応: ${diagnosticResult.supported ? '✅ 対応' : '❌ 非対応'}<br>
+                        ${diagnosticResult.version ? `WebGLバージョン: ${diagnosticResult.version}<br>` : ''}
+                        ${diagnosticResult.renderer ? `GPU: ${diagnosticResult.renderer}<br>` : ''}
+                        ${diagnosticResult.vendor ? `ベンダー: ${diagnosticResult.vendor}<br>` : ''}
+                        ${diagnosticResult.maxTextureSize > 0 ? `最大テクスチャサイズ: ${diagnosticResult.maxTextureSize}px<br>` : ''}
+                    </div>
+                    ${diagnosticResult.errors.length > 0 ? `<div style="color: #ff4444;">❌ エラー: ${diagnosticResult.errors.join(', ')}</div>` : ''}
+                    ${diagnosticResult.warnings.length > 0 ? `<div style="color: #ffaa00;">⚠️ 警告: ${diagnosticResult.warnings.join(', ')}</div>` : ''}
+                </div>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <strong>🔧 推奨される対処法:</strong>
+                    <ul style="text-align: left; margin: 0.5rem 0; padding-left: 1.5rem;">
+                        ${userMessage.actions.map(action => `<li style="margin: 0.3rem 0;">${action}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                    <button onclick="location.reload()" style="padding: 0.8rem 1.5rem; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                        🔄 ページを再読み込み
+                    </button>
+                    <button onclick="document.getElementById('webgl-error-modal').remove()" style="padding: 0.8rem 1.5rem; background: #666; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                        ❌ 閉じる
+                    </button>
+                    <button onclick="navigator.clipboard.writeText(JSON.stringify(${JSON.stringify(diagnosticResult).replace(/"/g, '\\"')}, null, 2)).then(() => alert('診断情報をクリップボードにコピーしました'))" style="padding: 0.8rem 1.5rem; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                        📋 診断情報コピー
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
     }
     
     setupScene() {
@@ -175,6 +399,40 @@ class Game {
         if (loadingElement) {
             loadingElement.style.display = 'none';
         }
+    }
+    
+    // エラーメッセージ表示
+    showErrorMessage(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 0, 0, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            z-index: 10000;
+            max-width: 80%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        `;
+        errorDiv.innerHTML = `
+            <h3>🚫 エラー</h3>
+            <p>${message}</p>
+            <button onclick="location.reload()" style="
+                background: #fff;
+                color: #000;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                margin-top: 10px;
+            ">リロード</button>
+        `;
+        document.body.appendChild(errorDiv);
     }
     
     handleKeyDown(event) {
